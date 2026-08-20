@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover" />
+  <meta name="theme-color" content="#f6f8fb" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="基金看板" />
+  <title>基金看板 · 手机版</title>
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="apple-touch-icon" href="./icons/icon-192.png" />
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div id="toast" class="toast hidden"></div>
+
+  <main class="app-shell">
+    <section id="loginView" class="auth-view hidden">
+      <div class="brand-card">
+        <div class="brand-icon">基</div>
+        <h1>基金看板</h1>
+        <p>电脑与手机共用同一份 Supabase 公共云端主线。</p>
+      </div>
+      <div class="panel auth-card">
+        <label>邮箱</label>
+        <input id="emailInput" type="email" autocomplete="username" placeholder="请输入基金看板账号邮箱" />
+        <label>密码</label>
+        <input id="passwordInput" type="password" autocomplete="current-password" placeholder="请输入密码" />
+        <button id="loginBtn" class="primary full">登录公共云端</button>
+        <p class="hint">登录密码只发送给 Supabase 认证接口，不写进网页源码。</p>
+      </div>
+    </section>
+
+    <section id="appView" class="hidden">
+      <header class="topbar">
+        <div>
+          <div class="eyebrow">基金看板 · 手机版</div>
+          <h1>我的基金</h1>
+        </div>
+        <button id="moreBtn" class="ghost icon-btn" aria-label="更多">•••</button>
+      </header>
+
+      <section id="statusCard" class="status-card">
+        <div>
+          <span class="status-dot"></span>
+          <span id="cloudStatus">正在连接公共云端…</span>
+        </div>
+        <small id="mainlineTime">--</small>
+      </section>
+
+      <section class="summary-grid">
+        <div class="summary-main panel">
+          <span class="label">当前持有额</span>
+          <strong id="totalAmount">¥--</strong>
+          <div class="summary-row">
+            <span>累计收益 <b id="totalProfit">--</b></span>
+            <span id="quoteCoverage">净值覆盖 --</span>
+          </div>
+        </div>
+        <div class="mini panel">
+          <span class="label">基金</span>
+          <strong id="fundCount">--</strong>
+        </div>
+        <div class="mini panel">
+          <span class="label">历史</span>
+          <strong id="historyCount">--/10</strong>
+        </div>
+      </section>
+
+      <section class="quick-actions">
+        <button id="refreshBtn"><span>↻</span>刷新净值</button>
+        <button id="tradeBtn"><span>＋</span>记录操作</button>
+        <button id="addBtn"><span>⊕</span>添加基金</button>
+        <button id="historyBtn"><span>◷</span>历史回溯</button>
+      </section>
+
+      <section class="section-head">
+        <div>
+          <h2>持仓</h2>
+          <p id="lastQuoteTime">行情尚未刷新</p>
+        </div>
+        <button id="editBtn" class="text-btn">持仓设置</button>
+      </section>
+
+      <section id="fundList" class="fund-list"></section>
+      <div id="emptyFunds" class="empty hidden">公共云端暂时没有基金。</div>
+
+      <footer class="footer-note">公共云端：Supabase · Singapore · 最近 10 次历史</footer>
+    </section>
+  </main>
+
+  <nav id="bottomNav" class="bottom-nav hidden">
+    <button class="active" data-nav="home"><span>⌂</span><small>首页</small></button>
+    <button data-nav="trade"><span>＋</span><small>操作</small></button>
+    <button data-nav="history"><span>◷</span><small>历史</small></button>
+    <button data-nav="settings"><span>⚙</span><small>设置</small></button>
+  </nav>
+
+  <div id="sheetBackdrop" class="backdrop hidden"></div>
+
+  <section id="tradeSheet" class="sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>记录基金操作</h3><button data-close="tradeSheet">×</button></div>
+    <label>基金</label>
+    <select id="tradeCode"></select>
+    <label>操作</label>
+    <select id="tradeAction"><option value="buy">买入 / 加仓</option><option value="sell">卖出 / 减仓</option><option value="clear">清仓</option></select>
+    <div id="tradeAmountWrap"><label>金额（元）</label><input id="tradeAmount" type="number" min="0" step="0.01" inputmode="decimal" /></div>
+    <label>操作日期</label>
+    <input id="tradeDate" type="date" />
+    <p class="hint">先记录为待确认；该日期正式净值出现后，系统会按正式净值确认份额和成本。</p>
+    <button id="saveTradeBtn" class="primary full">保存操作并生成新主线</button>
+  </section>
+
+  <section id="addSheet" class="sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>添加基金</h3><button data-close="addSheet">×</button></div>
+    <label>6位基金代码</label><input id="addCode" maxlength="6" inputmode="numeric" placeholder="例如 110020" />
+    <label>基金名称</label><input id="addName" placeholder="可先刷新识别，或手动填写" />
+    <label>类型</label>
+    <select id="addType"><option value="index">指数</option><option value="equity">偏股</option><option value="flexBond">固收+</option><option value="shortBond">短债</option></select>
+    <div class="two-col"><div><label>持有份额</label><input id="addShares" type="number" step="0.0001" inputmode="decimal" placeholder="可留空" /></div><div><label>累计成本</label><input id="addCost" type="number" step="0.01" inputmode="decimal" placeholder="0.00" /></div></div>
+    <label>若不知道份额，可填当前持有额</label><input id="addAmount" type="number" step="0.01" inputmode="decimal" placeholder="可留空" />
+    <button id="lookupAddBtn" class="secondary full">识别名称 / 最新净值</button>
+    <button id="saveAddBtn" class="primary full">添加并生成新主线</button>
+  </section>
+
+  <section id="editSheet" class="sheet sheet-tall hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>持仓设置</h3><button data-close="editSheet">×</button></div>
+    <div id="editList" class="edit-list"></div>
+    <button id="saveEditBtn" class="primary full sticky-save">保存设置并生成新主线</button>
+  </section>
+
+  <section id="historySheet" class="sheet sheet-tall hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>最近 10 次历史</h3><button data-close="historySheet">×</button></div>
+    <div id="historyList" class="history-list"></div>
+  </section>
+
+  <section id="moreSheet" class="sheet hidden">
+    <div class="sheet-handle"></div>
+    <div class="sheet-head"><h3>更多</h3><button data-close="moreSheet">×</button></div>
+    <button id="installBtn" class="secondary full hidden">添加到手机桌面</button>
+    <button id="exportBtn" class="secondary full">导出当前云端主线 JSON</button>
+    <button id="logoutBtn" class="danger full">退出登录</button>
+    <p class="hint">网页使用 Publishable key + 登录令牌访问；没有包含 service_role 或数据库管理员密码。</p>
+  </section>
+
+  <script src="./app.js"></script>
+</body>
+</html>
