@@ -16,3 +16,13 @@
 .auth-view{padding-top:7vh}.brand-card{text-align:center;padding:28px 12px}.brand-icon{width:68px;height:68px;border-radius:20px;background:linear-gradient(135deg,#2f6fed,#6e9bff);color:#fff;display:grid;place-items:center;font-size:30px;font-weight:900;margin:0 auto 14px;box-shadow:0 10px 30px rgba(47,111,237,.25)}.brand-card h1{margin:0;font-size:30px}.brand-card p{color:var(--muted);font-size:13px}.auth-card{padding:18px}.auth-card label{display:block;font-size:12px;font-weight:700;color:#59677a;margin:10px 0 6px}
 .toast{position:fixed;z-index:50;left:50%;transform:translateX(-50%);bottom:86px;background:#1d2b3e;color:#fff;padding:10px 14px;border-radius:11px;max-width:90%;font-size:12px;box-shadow:0 8px 24px rgba(0,0,0,.2)}
 @media(min-width:700px){.app-shell{padding-left:24px;padding-right:24px}.sheet{padding-left:24px;padding-right:24px}}
+/* v1.1: 实时参考 + 全屏持仓设置 */
+.fund-grid-4{grid-template-columns:repeat(2,minmax(0,1fr))}
+.fund-grid small{display:block;margin-top:3px;font-size:9px;color:#94a0b2;line-height:1.35}
+.fund-card{cursor:pointer}
+.sheet-full{top:0;bottom:0;height:100dvh;max-height:none;border-radius:0;padding-top:calc(10px + env(safe-area-inset-top));padding-bottom:calc(22px + env(safe-area-inset-bottom))}
+.sheet-sub{margin:4px 0 0;color:var(--muted);font-size:11px;line-height:1.45}
+.sheet-full .sheet-head{position:sticky;top:-8px;background:#fff;z-index:3;padding:8px 0 10px;border-bottom:1px solid var(--line)}
+.sheet-full .sticky-save{bottom:0;margin-bottom:0;background:var(--blue)}
+.edit-row{scroll-margin-top:92px}
+@media(min-width:700px){.sheet-full{top:3vh;bottom:3vh;height:94vh;border-radius:24px}}

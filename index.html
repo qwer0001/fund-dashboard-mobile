@@ -10,7 +10,7 @@
   <title>基金看板 · 手机版</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css" />
+  <link rel="stylesheet" href="./styles.css?v=1.1.0" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -35,7 +35,7 @@
     <section id="appView" class="hidden">
       <header class="topbar">
         <div>
-          <div class="eyebrow">基金看板 · 手机版</div>
+          <div class="eyebrow">基金看板 · 手机版 v1.1</div>
           <h1>我的基金</h1>
         </div>
         <button id="moreBtn" class="ghost icon-btn" aria-label="更多">•••</button>
@@ -55,6 +55,8 @@
           <strong id="totalAmount">¥--</strong>
           <div class="summary-row">
             <span>累计收益 <b id="totalProfit">--</b></span>
+            <span>今日参考 <b id="liveProfit" class="flat">--</b></span>
+            <span id="liveCoverage">覆盖 --</span>
             <span id="quoteCoverage">净值覆盖 --</span>
           </div>
         </div>
@@ -126,9 +128,9 @@
     <button id="saveAddBtn" class="primary full">添加并生成新主线</button>
   </section>
 
-  <section id="editSheet" class="sheet sheet-tall hidden">
+  <section id="editSheet" class="sheet sheet-full hidden">
     <div class="sheet-handle"></div>
-    <div class="sheet-head"><h3>持仓设置</h3><button data-close="editSheet">×</button></div>
+    <div class="sheet-head"><div><h3>持仓设置</h3><p class="sheet-sub">修改份额、累计成本、名称和类型。保存后会生成新的云端主线。</p></div><button data-close="editSheet">×</button></div>
     <div id="editList" class="edit-list"></div>
     <button id="saveEditBtn" class="primary full sticky-save">保存设置并生成新主线</button>
   </section>
@@ -148,6 +150,6 @@
     <p class="hint">网页使用 Publishable key + 登录令牌访问；没有包含 service_role 或数据库管理员密码。</p>
   </section>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=1.1.0"></script>
 </body>
 </html>

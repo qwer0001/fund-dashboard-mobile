@@ -4,7 +4,8 @@ const SB_URL='https://bdqvhpuzricmpfkomnli.supabase.co';
 const SB_KEY='sb_publishable_NC1WUyEGSlZfgfyQR7JBxA_AM14sz39';
 const SESSION_KEY='fd_mobile_supabase_session_v1';
 const CACHE_KEY='fd_mobile_mainline_cache_v1';
-const QUOTE_KEY='fd_mobile_quote_cache_v1';
+const QUOTE_KEY='fd_mobile_quote_cache_v2';
+const MARKET_KEY='fd_mobile_market_cache_v1';
 const DEVICE_KEY='fd_mobile_device_id_v1';
 const HISTORY_LIMIT=10;
 
@@ -21,7 +22,7 @@ const fmtTime=v=>{const d=new Date(v);if(!v||Number.isNaN(d.getTime()))return'--
 const esc=s=>String(s??'').replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 const typeLabel=t=>({equity:'偏股',index:'指数',flexBond:'固收+',shortBond:'短债'})[t]||t||'--';
 
-let state={session:null,current:null,history:[],cores:[],quotes:{},busy:false};
+let state={session:null,current:null,history:[],cores:[],quotes:{},markets:{},busy:false};
 let installPrompt=null;
 
 function toast(msg,ms=2200){const e=$('#toast');e.textContent=msg;e.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hidden'),ms);}
@@ -33,8 +34,8 @@ function coreProfit(core,q){return currentAmount(core,q)-Math.max(0,Number(core?
 function coreFingerprint(cores=[]){const clean=(Array.isArray(cores)?cores:[]).map(c=>({code:String(c.code||''),name:String(c.name||''),type:String(c.type||'index'),enabled:c.enabled!==false,cost:Math.max(0,Number(c.cost||0)),shares:finite(c.shares)?Number(c.shares):null,amountAnchor:pos(c.shares)?null:(finite(c.amountAnchor)?Math.max(0,Number(c.amountAnchor)):null),startDate:c.startDate||null,pendingTrades:(Array.isArray(c.pendingTrades)?c.pendingTrades:[]).slice(-50).map(t=>({id:String(t.id||''),date:String(t.date||''),action:String(t.action||''),amount:Number(t.amount||0),feeRate:Number(t.feeRate||0),applied:Boolean(t.applied),appliedNav:finite(t.appliedNav)?Number(t.appliedNav):null,appliedDate:t.appliedDate||null,approximate:Boolean(t.approximate),deferredAccounting:Boolean(t.deferredAccounting),createdAt:t.createdAt||null})),createdByQuickTrade:Boolean(c.createdByQuickTrade)})).sort((a,b)=>a.code.localeCompare(b.code));return JSON.stringify(clean);}
 function ledgerFromCores(cores){return{schema:1,cores:clone(cores)};}
 
-function saveCache(){if(state.current)localStorage.setItem(CACHE_KEY,JSON.stringify({current:state.current,history:state.history,at:Date.now()}));localStorage.setItem(QUOTE_KEY,JSON.stringify(state.quotes||{}));}
-function loadCache(){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(c?.current){state.current=c.current;state.history=c.history||[];state.cores=ledgerCores(c.current);}state.quotes=JSON.parse(localStorage.getItem(QUOTE_KEY)||'{}')||{};}catch(_){}}
+function saveCache(){if(state.current)localStorage.setItem(CACHE_KEY,JSON.stringify({current:state.current,history:state.history,at:Date.now()}));localStorage.setItem(QUOTE_KEY,JSON.stringify(state.quotes||{}));localStorage.setItem(MARKET_KEY,JSON.stringify(state.markets||{}));}
+function loadCache(){try{const c=JSON.parse(localStorage.getItem(CACHE_KEY)||'null');if(c?.current){state.current=c.current;state.history=c.history||[];state.cores=ledgerCores(c.current);}state.quotes=JSON.parse(localStorage.getItem(QUOTE_KEY)||'{}')||{};state.markets=JSON.parse(localStorage.getItem(MARKET_KEY)||'{}')||{};}catch(_){}}
 
 async function sbFetch(path,{method='GET',body=null,auth=true,retry=true}={}){
   if(auth)await validSession();
@@ -81,10 +82,20 @@ function render(){
   setStatus(state.current?'公共云端最新主线已连接':'公共云端没有主线',state.current?'ok':'bad');
   const enabled=state.cores.filter(c=>c.enabled!==false);let total=0,cost=0,covered=0;
   for(const c of enabled){const q=state.quotes[c.code]||{};const amt=currentAmount(c,q);total+=amt;cost+=Math.max(0,Number(c.cost||0));if(pos(q.officialNav)||finite(c.amountAnchor))covered++;}
-  $('#totalAmount').textContent=`¥${money(total)}`;const profit=total-cost;$('#totalProfit').textContent=`${profit>=0?'+':''}${money(profit)}`;$('#totalProfit').className=tone(profit);$('#quoteCoverage').textContent=`净值覆盖 ${enabled.length?Math.round(covered/enabled.length*100):0}%`;$('#fundCount').textContent=String(enabled.length);$('#historyCount').textContent=`${state.history.length}/${HISTORY_LIMIT}`;
+  $('#totalAmount').textContent=`¥${money(total)}`;const profit=total-cost;$('#totalProfit').textContent=`${profit>=0?'+':''}${money(profit)}`;$('#totalProfit').className=tone(profit);$('#quoteCoverage').textContent=`净值覆盖 ${enabled.length?Math.round(covered/enabled.length*100):0}%`;$('#fundCount').textContent=String(enabled.length);$('#historyCount').textContent=`${state.history.length}/${HISTORY_LIMIT}`;const liveFunds=enabled.map(c=>({c,q:state.quotes[c.code]||{}})).filter(x=>finite(x.q.estPct));const liveProfit=liveFunds.reduce((sum,x)=>sum+currentAmount(x.c,x.q)*Number(x.q.estPct)/100,0);$('#liveProfit').textContent=liveFunds.length?`${liveProfit>=0?'+':''}¥${money(liveProfit)}`:'--';$('#liveProfit').className=liveFunds.length?tone(liveProfit):'flat';$('#liveCoverage').textContent=`覆盖 ${liveFunds.length}/${enabled.filter(c=>!isBondCore(c)).length} 只可估基金`;
   renderFunds();renderTradeSelect();saveCache();
 }
-function renderFunds(){const list=$('#fundList');const arr=state.cores.filter(c=>c.enabled!==false);$('#emptyFunds').classList.toggle('hidden',arr.length>0);list.innerHTML=arr.map(c=>{const q=state.quotes[c.code]||{},amt=currentAmount(c,q),profit=coreProfit(c,q),pend=pendingCount(c);const est=finite(q.estPct)?Number(q.estPct):null;return `<article class="fund-card"><div class="fund-top"><div><div class="fund-name">${esc(c.name||c.code)}</div><div class="fund-code">${esc(c.code)} · ${esc(typeLabel(c.type))}</div></div><div class="fund-amount">¥${money(amt)}</div></div><div class="fund-grid"><div><span>累计收益</span><b class="${tone(profit)}">${profit>=0?'+':''}${money(profit)}</b></div><div><span>最新净值</span><b>${navfmt(q.officialNav)}</b></div><div><span>盘中参考</span><b class="${tone(est)}">${pct(est)}</b></div></div>${pend?`<div class="pending">有 ${pend} 笔待确认操作；刷新正式净值后会尝试确认。</div>`:''}</article>`;}).join('');}
+function renderFunds(){
+  const list=$('#fundList');const arr=state.cores.filter(c=>c.enabled!==false);$('#emptyFunds').classList.toggle('hidden',arr.length>0);
+  list.innerHTML=arr.map(c=>{
+    const q=state.quotes[c.code]||{},amt=currentAmount(c,q),profit=coreProfit(c,q),pend=pendingCount(c),isBond=isBondCore(c);
+    const est=finite(q.estPct)?Number(q.estPct):null;
+    const estProfit=est!==null?amt*est/100:null;
+    const liveText=est!==null?pct(est):(isBond?'等正式':'暂无');
+    const liveSub=est!==null?(q.estSource||q.estTime||'盘中参考'):(isBond?'债基不使用盘中估值':'暂未匹配实时代理');
+    return `<article class="fund-card" data-code="${esc(c.code)}"><div class="fund-top"><div><div class="fund-name">${esc(c.name||c.code)}</div><div class="fund-code">${esc(c.code)} · ${esc(typeLabel(c.type))}</div></div><div class="fund-amount">¥${money(amt)}</div></div><div class="fund-grid fund-grid-4"><div><span>累计收益</span><b class="${tone(profit)}">${profit>=0?'+':''}${money(profit)}</b></div><div><span>最新净值</span><b>${navfmt(q.officialNav)}</b><small>${esc(q.officialDate||'')}</small></div><div><span>今日参考涨幅</span><b class="${tone(est)}">${liveText}</b><small>${esc(liveSub)}</small></div><div><span>今日参考盈亏</span><b class="${tone(estProfit)}">${estProfit===null?'--':`${estProfit>=0?'+':''}¥${money(estProfit)}`}</b><small>${est!==null?(q.estReliable?'参考较可靠':'仅作方向参考'):''}</small></div></div>${pend?`<div class="pending">有 ${pend} 笔待确认操作；刷新正式净值后会尝试确认。</div>`:''}</article>`;
+  }).join('');
+}
 function renderTradeSelect(){const s=$('#tradeCode');if(!s)return;s.innerHTML=state.cores.filter(c=>c.enabled!==false).map(c=>`<option value="${esc(c.code)}">${esc(c.code)} ${esc(c.name||'')}</option>`).join('');}
 
 function openSheet(id){$('#sheetBackdrop').classList.remove('hidden');$(`#${id}`).classList.remove('hidden');document.body.style.overflow='hidden';}
@@ -99,15 +110,48 @@ async function fetchStaticQuote(code){
 async function fetchIntradayQuote(code){
   return new Promise((resolve,reject)=>{const old=window.jsonpgz;let done=false;const s=document.createElement('script');const finish=(err,row)=>{if(done)return;done=true;clearTimeout(t);s.remove();window.jsonpgz=old;if(err)reject(err);else resolve(row);};window.jsonpgz=row=>finish(null,{name:row?.name||'',estNav:finite(row?.gsz)?Number(row.gsz):null,estPct:finite(row?.gszzl)?Number(row.gszzl):null,estTime:row?.gztime||'',officialNav:finite(row?.dwjz)?Number(row.dwjz):null,officialDate:row?.jzrq||''});s.src=`https://fundgz.1234567.com.cn/js/${encodeURIComponent(code)}.js?rt=${Date.now()}`;s.onerror=()=>finish(new Error('盘中估值加载失败'));const t=setTimeout(()=>finish(new Error('盘中估值超时')),6500);document.head.appendChild(s);});
 }
+
+function jsonpLoad(url,callbackParam='cb',timeout=7000){
+  return new Promise((resolve,reject)=>{
+    const cb=`__fdjsonp_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+    const s=document.createElement('script');let done=false;
+    const finish=(err,data)=>{if(done)return;done=true;clearTimeout(t);try{delete window[cb];}catch(_){window[cb]=undefined;}s.remove();err?reject(err):resolve(data);};
+    window[cb]=data=>finish(null,data);
+    const sep=url.includes('?')?'&':'?';
+    s.src=`${url}${sep}${encodeURIComponent(callbackParam)}=${encodeURIComponent(cb)}&_=${Date.now()}`;
+    s.async=true;s.onerror=()=>finish(new Error('实时指数源加载失败'));
+    const t=setTimeout(()=>finish(new Error('实时指数源超时')),timeout);
+    document.head.appendChild(s);
+  });
+}
+async function fetchProxyMarkets(){
+  const base='https://push2.eastmoney.com/api/qt/ulist.np/get?fltt=2&invt=2&fields=f2,f3,f4,f12,f14&secids=1.000300,2.931151,1.000933';
+  const json=await jsonpLoad(base,'cb',7000);
+  const diff=Array.isArray(json?.data?.diff)?json.data.diff:[];
+  const map={};
+  for(const r of diff){if(r?.f12)map[String(r.f12)]={price:finite(r.f2)?Number(r.f2):null,pct:finite(r.f3)?Number(r.f3):null,change:finite(r.f4)?Number(r.f4):null,name:r.f14||'',time:new Date().toISOString()};}
+  if(Object.keys(map).length)state.markets=map;
+  return map;
+}
+function proxyEstimateForCore(core){
+  const code=String(core?.code||'');let q=null,mul=1,label='',reliable=true;
+  if(code==='110020'){q=state.markets['000300'];mul=.95;label='沪深300实时代理';reliable=true;}
+  else if(code==='011103'){q=state.markets['931151'];mul=.98;label='光伏指数实时代理';reliable=true;}
+  else if(code==='003096'){q=state.markets['000933'];mul=.65;label='医药指数实时代理';reliable=false;}
+  if(q&&finite(q.pct))return{estPct:Number(q.pct)*mul,estTime:'实时指数',estSource:label,estReliable:reliable};
+  return null;
+}
+function isBondCore(core){return core?.type==='shortBond'||core?.type==='flexBond';}
+
 function applyPending(core,officialNav,officialDate){
   if(!pos(officialNav)||!officialDate)return{core,changed:false};const n=clone(core),list=Array.isArray(n.pendingTrades)?n.pendingTrades:[];if(!list.length)return{core:n,changed:false};let shares=finite(n.shares)?Number(n.shares):(finite(n.amountAnchor)?Number(n.amountAnchor)/officialNav:NaN),cost=Math.max(0,Number(n.cost||0)),changed=false;
   n.pendingTrades=list.map(t=>{if(t.applied||t.date!==officialDate||!Number.isFinite(shares))return t;if(t.action==='buy'){const fee=Math.max(0,Number(t.feeRate||0))/100,gross=Math.max(0,Number(t.amount||0));shares+=gross/(1+fee)/officialNav;cost+=gross;changed=true;return{...t,applied:true,appliedNav:officialNav,appliedDate:officialDate,deferredAccounting:true};}if(t.action==='sell'){const gross=Math.max(0,Number(t.amount||0)),before=shares,sold=Math.min(before,gross/officialNav);shares=Math.max(0,before-sold);if(before>0)cost*=shares/before;changed=true;return{...t,applied:true,appliedNav:officialNav,appliedDate:officialDate,approximate:true,deferredAccounting:true};}if(t.action==='clear'){shares=0;cost=0;changed=true;return{...t,applied:true,appliedNav:officialNav,appliedDate:officialDate,approximate:false,deferredAccounting:true};}return t;}).slice(-30);
   if(changed){n.shares=shares;n.cost=Math.max(0,cost);n.amountAnchor=null;n.updatedAt=Date.now();}return{core:n,changed};
 }
-async function quoteOne(core){let official=null,intra=null;try{official=await fetchStaticQuote(core.code);}catch(_){ }try{intra=await fetchIntradayQuote(core.code);}catch(_){ }const q={...(state.quotes[core.code]||{}),name:official?.name||intra?.name||core.name,officialNav:official?.officialNav||intra?.officialNav||null,officialDate:official?.officialDate||intra?.officialDate||'',officialPct:official?.officialPct??null,estNav:intra?.estNav??null,estPct:intra?.estPct??null,estTime:intra?.estTime||'',fetchedAt:Date.now()};state.quotes[core.code]=q;return q;}
+async function quoteOne(core){let official=null,intra=null;try{official=await fetchStaticQuote(core.code);}catch(_){ }try{intra=await fetchIntradayQuote(core.code);}catch(_){ }const px=(!finite(intra?.estPct)&&!isBondCore(core))?proxyEstimateForCore(core):null;const q={...(state.quotes[core.code]||{}),name:official?.name||intra?.name||core.name,officialNav:official?.officialNav||intra?.officialNav||null,officialDate:official?.officialDate||intra?.officialDate||'',officialPct:official?.officialPct??null,estNav:intra?.estNav??null,estPct:finite(intra?.estPct)?Number(intra.estPct):(px?.estPct??null),estTime:intra?.estTime||px?.estTime||'',estSource:finite(intra?.estPct)?'基金盘中估值':(px?.estSource||''),estReliable:finite(intra?.estPct)?!isBondCore(core):(px?.estReliable??false),fetchedAt:Date.now()};state.quotes[core.code]=q;return q;}
 async function refreshQuotes(){
   if(state.busy)return;state.busy=true;const b=$('#refreshBtn');b.disabled=true;b.textContent='刷新中…';const before=coreFingerprint(state.cores);let confirmed=0;
-  try{const next=clone(state.cores);for(let i=0;i<next.length;i++){if(next[i].enabled===false)continue;const q=await quoteOne(next[i]);const a=applyPending(next[i],q.officialNav,q.officialDate);if(a.changed){next[i]=a.core;confirmed++;}}
+  try{try{await fetchProxyMarkets();}catch(_){}const next=clone(state.cores);for(let i=0;i<next.length;i++){if(next[i].enabled===false)continue;const q=await quoteOne(next[i]);const a=applyPending(next[i],q.officialNav,q.officialDate);if(a.changed){next[i]=a.core;confirmed++;}}
     state.cores=next;$('#lastQuoteTime').textContent=`最近刷新 ${fmtTime(Date.now())}`;if(coreFingerprint(next)!==before){await commit(next,`手机版正式净值确认交易 / 更新持有份额（${confirmed}只基金）`);toast(`已确认 ${confirmed} 只基金的待确认操作`);}else{saveCache();render();toast('净值刷新完成');}
   }catch(e){if(e.code==='revision_conflict'){await loadCloud();toast('云端已被其他设备更新，本次确认未覆盖云端',3500);}else toast(e.message,3500);}finally{state.busy=false;b.disabled=false;b.innerHTML='<span>↻</span>刷新净值';}
 }
@@ -117,7 +161,10 @@ async function saveTrade(){const code=$('#tradeCode').value,action=$('#tradeActi
 async function lookupAdd(){const code=$('#addCode').value.trim();if(!/^\d{6}$/.test(code))return toast('请输入6位基金代码');const b=$('#lookupAddBtn');b.disabled=true;b.textContent='识别中…';try{const q=await fetchStaticQuote(code);state.quotes[code]={...(state.quotes[code]||{}),...q,fetchedAt:Date.now()};if(q.name)$('#addName').value=q.name;toast(`最新净值 ${navfmt(q.officialNav)} · ${q.officialDate||'--'}`);}catch(e){toast(e.message,3000);}finally{b.disabled=false;b.textContent='识别名称 / 最新净值';}}
 async function saveAdd(){const code=$('#addCode').value.trim(),name=$('#addName').value.trim(),type=$('#addType').value,shares=$('#addShares').value===''?null:Number($('#addShares').value),cost=Math.max(0,Number($('#addCost').value||0)),amount=$('#addAmount').value===''?null:Math.max(0,Number($('#addAmount').value));if(!/^\d{6}$/.test(code))return toast('请输入6位基金代码');if(state.cores.some(c=>c.code===code))return toast('这只基金已经存在');if(!name)return toast('请填写基金名称');if(shares!==null&&!Number.isFinite(shares))return toast('持有份额格式不正确');const next=clone(state.cores);next.push({code,name,type,enabled:true,cost,shares,amountAnchor:shares!==null&&shares>0?null:(amount??0),startDate:new Date().toISOString().slice(0,10),pendingTrades:[],createdByQuickTrade:false,updatedAt:Date.now()});try{await commit(next,`手机版新增基金 ${code} ${name}`);closeSheets();toast('基金已添加并写入公共云端');}catch(e){if(e.code==='revision_conflict'){await loadCloud();toast('云端已更新，请重新添加',3500);}else toast(e.message,3500);}}
 
-function renderEdit(){const box=$('#editList');box.innerHTML=state.cores.map((c,i)=>`<div class="edit-row" data-i="${i}"><div class="edit-row-head"><div><b>${esc(c.code)} ${esc(c.name||'')}</b><div class="fund-code">${esc(typeLabel(c.type))}</div></div><button class="delete-fund" data-delete="${i}">删除</button></div><div class="edit-fields"><div><label>持有份额</label><input data-k="shares" type="number" step="0.0001" value="${finite(c.shares)?esc(String(c.shares)):''}"></div><div><label>累计成本</label><input data-k="cost" type="number" step="0.01" value="${esc(String(Number(c.cost||0)))}"></div></div><label>名称</label><input data-k="name" value="${esc(c.name||'')}"><label>类型</label><select data-k="type"><option value="index" ${c.type==='index'?'selected':''}>指数</option><option value="equity" ${c.type==='equity'?'selected':''}>偏股</option><option value="flexBond" ${c.type==='flexBond'?'selected':''}>固收+</option><option value="shortBond" ${c.type==='shortBond'?'selected':''}>短债</option></select></div>`).join('');}
+function renderEdit(){
+  const box=$('#editList');
+  box.innerHTML=state.cores.map((c,i)=>{const q=state.quotes[c.code]||{};return `<div class="edit-row" data-i="${i}"><div class="edit-row-head"><div><b>${esc(c.code)} ${esc(c.name||'')}</b><div class="fund-code">${esc(typeLabel(c.type))} · 当前持有额 ¥${money(currentAmount(c,q))} · 最新净值 ${navfmt(q.officialNav)}</div></div><button class="delete-fund" data-delete="${i}">删除</button></div><div class="edit-fields"><div><label>持有份额</label><input data-k="shares" type="number" step="0.0001" inputmode="decimal" value="${finite(c.shares)?esc(String(c.shares)):''}"></div><div><label>累计成本（元）</label><input data-k="cost" type="number" step="0.01" inputmode="decimal" value="${esc(String(Number(c.cost||0)))}"></div></div><label>基金名称</label><input data-k="name" value="${esc(c.name||'')}"><label>基金类型</label><select data-k="type"><option value="index" ${c.type==='index'?'selected':''}>指数</option><option value="equity" ${c.type==='equity'?'selected':''}>偏股</option><option value="flexBond" ${c.type==='flexBond'?'selected':''}>固收+</option><option value="shortBond" ${c.type==='shortBond'?'selected':''}>短债</option></select></div>`}).join('');
+}
 function editDraft(){const out=[];$$('#editList .edit-row').forEach(r=>{const i=Number(r.dataset.i),c=clone(state.cores[i]);if(!c)return;r.querySelectorAll('[data-k]').forEach(el=>{const k=el.dataset.k;if(k==='shares')c[k]=el.value===''?null:Number(el.value);else if(k==='cost')c[k]=Math.max(0,Number(el.value||0));else c[k]=el.value;});if(pos(c.shares))c.amountAnchor=null;c.updatedAt=Date.now();out.push(c);});return out;}
 async function saveEdit(){const next=editDraft();try{await commit(next,'手机版修改持仓设置');closeSheets();toast('持仓设置已保存');}catch(e){if(e.code==='revision_conflict'){await loadCloud();toast('云端已被其他设备更新，请重新修改',3500);}else toast(e.message,3500);}}
 
@@ -131,9 +178,11 @@ function bind(){
   $('#passwordInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('#loginBtn').click();});
   $('#refreshBtn').onclick=refreshQuotes;$('#tradeBtn').onclick=()=>openSheet('tradeSheet');$('#addBtn').onclick=()=>openSheet('addSheet');$('#historyBtn').onclick=()=>{renderHistory();openSheet('historySheet');};$('#editBtn').onclick=()=>{renderEdit();openSheet('editSheet');};$('#moreBtn').onclick=()=>openSheet('moreSheet');
   $('#tradeAction').onchange=()=>$('#tradeAmountWrap').classList.toggle('hidden',$('#tradeAction').value==='clear');$('#saveTradeBtn').onclick=saveTrade;$('#lookupAddBtn').onclick=lookupAdd;$('#saveAddBtn').onclick=saveAdd;$('#saveEditBtn').onclick=saveEdit;$('#exportBtn').onclick=exportMainline;$('#logoutBtn').onclick=logout;$('#sheetBackdrop').onclick=closeSheets;$$('[data-close]').forEach(b=>b.onclick=closeSheets);
+
+  $('#fundList').addEventListener('click',e=>{const card=e.target.closest('.fund-card');if(!card)return;renderEdit();openSheet('editSheet');const row=[...document.querySelectorAll('#editList .edit-row')].find(r=>state.cores[Number(r.dataset.i)]?.code===card.dataset.code);if(row)setTimeout(()=>row.scrollIntoView({block:'start',behavior:'smooth'}),80);});
   $('#editList').addEventListener('click',e=>{const b=e.target.closest('[data-delete]');if(!b)return;if(!confirm('确定删除这只基金？保存后会生成新的云端主线，旧主线仍会进入最近10次历史。'))return;const r=b.closest('.edit-row');r.remove();});
   $('#historyList').addEventListener('click',async e=>{const b=e.target.closest('[data-restore]');if(!b)return;if(!confirm(`确定把 ${fmtTime(b.dataset.time)} 的内容设为新的最新主线吗？\n\n当前主线会先进入历史，所以这次回溯仍然可以反悔。`))return;try{await restoreHistory(b.dataset.restore);renderHistory();toast('历史版本已生成新的最新主线');}catch(err){if(err.code==='revision_conflict'){await loadCloud();renderHistory();toast('云端已被其他设备更新，请重新选择历史版本',3500);}else toast(err.message,3500);}});
-  $$('#bottomNav [data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;if(n==='home')window.scrollTo({top:0,behavior:'smooth'});if(n==='trade')openSheet('tradeSheet');if(n==='history'){renderHistory();openSheet('historySheet');}if(n==='settings')openSheet('moreSheet');});
+  $$('#bottomNav [data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;if(n==='home')window.scrollTo({top:0,behavior:'smooth'});if(n==='trade')openSheet('tradeSheet');if(n==='history'){renderHistory();openSheet('historySheet');}if(n==='settings'){renderEdit();openSheet('editSheet');}});
   window.addEventListener('beforeinstallprompt',e=>{e.preventDefault();installPrompt=e;$('#installBtn').classList.remove('hidden');});$('#installBtn').onclick=async()=>{if(!installPrompt)return toast('请使用浏览器菜单里的“添加到主屏幕”');installPrompt.prompt();await installPrompt.userChoice;installPrompt=null;$('#installBtn').classList.add('hidden');};
   window.addEventListener('online',()=>{if(state.session)loadCloud().then(()=>toast('网络已恢复，主线已刷新')).catch(()=>{});});
 }
