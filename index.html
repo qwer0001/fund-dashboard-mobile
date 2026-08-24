@@ -10,7 +10,7 @@
   <title>基金看板 · 私密版</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=2.3.5" />
+  <link rel="stylesheet" href="./styles.css?v=2.3.6" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -19,13 +19,13 @@
     <div class="login-brand">
       <div class="app-icon">基</div>
       <h1>基金看板</h1>
-      <p>私密手机版 · 登录验证通过后才显示基金数据</p>
+      <p>私密手机版 · 只有成功登录过的本机才可自动进入</p>
     </div>
     <section class="login-card">
       <div class="privacy-badge">🔒 私密访问</div>
       <label>邮箱<input id="emailInput" type="email" autocomplete="username" placeholder="请输入基金看板账号邮箱"></label>
       <label>密码<input id="passwordInput" type="password" autocomplete="current-password" placeholder="请输入密码"></label>
-      <button id="loginBtn" class="primary full">安全登录</button>
+      <button id="loginBtn" type="button" class="primary full">安全登录</button>
       <small id="loginStatus">未登录时不会读取或显示持仓、收益、历史记录；退出登录后会清理本机敏感缓存。</small>
     </section>
   </main>
@@ -166,6 +166,6 @@
     </div>
   </section>
 
-  <script src="./app.js?v=2.3.5"></script>
+  <script src="./app.js?v=2.3.6"></script>
 </body>
 </html>

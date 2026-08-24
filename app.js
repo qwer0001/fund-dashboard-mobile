@@ -4,7 +4,8 @@ const SB_URL='https://bdqvhpuzricmpfkomnli.supabase.co';
 const SB_KEY='sb_publishable_NC1WUyEGSlZfgfyQR7JBxA_AM14sz39';
 const FN_URL=`${SB_URL}/functions/v1/fund-quotes`;
 const SESSION_KEY='fd_mobile_supabase_session_v1';
-const PRIVACY_MIGRATION_KEY='fd_private_login_guard_v235_once';
+const PRIVACY_MIGRATION_KEY='fd_private_login_guard_v236_once';
+const TRUSTED_DEVICE_KEY='fd_mobile_trusted_login_v236';
 const CACHE_KEY='fd_mobile_desktop_parity_cache_v230';
 const QUOTE_KEY='fd_mobile_quote_cache_v230';
 const MARKET_KEY='fd_mobile_market_cache_v2';
@@ -123,7 +124,7 @@ async function autoMatch(){let changed=0;for(const c of state.cores){if(pos(c.sh
 function renderHistory(){const c=state.current;$('#currentMainline').innerHTML=c?`<b>当前最新主线：${esc(fmtTime(c.updated_at))}</b><div class="history-meta">${state.cores.length}只基金 · ${esc(c.operation||'公共主线')} · ${esc(c.device_name||'')}</div>`:'<b>暂无公共主线</b>';$('#historyList').innerHTML=state.history.length?state.history.map(h=>`<div class="history-item"><div class="history-top"><div class="history-time">${esc(fmtTime(h.created_at))}</div><div>${ledgerCores(h).length}只基金</div></div><div class="history-meta">${esc(h.operation||'历史版本')} · ${esc(h.device_name||'')}</div><button data-restore="${esc(h.id)}" data-time="${esc(h.created_at||'')}">设为最新主线</button></div>`).join(''):'<div class="muted">还没有历史版本。</div>';}
 
 async function runDiag(){const out=[];$('#diagResult').textContent='诊断中…';try{const t=Date.now();await fetchCurrent();out.push(`私密云端：OK (${Date.now()-t}ms)`);}catch(e){out.push(`私密云端：失败 · ${e.message}`);}try{const t=Date.now(),d=await fnFetch({action:'ping'});out.push(`行情代理：OK (${Date.now()-t}ms) · 市场数据 ${d.markets||0} 项`);}catch(e){out.push(`行情代理：失败 · ${e.message}`);}out.push(`本地主线缓存：${state.current?'有':'无'}`);out.push(`登录状态：${state.session?.user?.email||'未登录'}`);$('#diagResult').textContent=out.join('\n');}
-async function logout(){try{if(state.session?.accessToken)await fetch(`${SB_URL}/auth/v1/logout`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${state.session.accessToken}`},cache:'no-store'});}catch(_){}clearSession();clearSensitiveState();clearSensitiveCache();setLoginStatus('已安全退出。本机持仓、历史与基金行情缓存已清理。','ok');render();closeSheets();}
+async function logout(){try{if(state.session?.accessToken)await fetch(`${SB_URL}/auth/v1/logout`,{method:'POST',headers:{apikey:SB_KEY,Authorization:`Bearer ${state.session.accessToken}`},cache:'no-store'});}catch(_){}clearSession();try{localStorage.removeItem(TRUSTED_DEVICE_KEY);}catch(_){}clearSensitiveState();clearSensitiveCache();setLoginStatus('已安全退出。这台手机的免登录授权已取消。','ok');render();closeSheets();}
 function copySummary(){const funds=state.cores.filter(c=>c.enabled!==false),total=funds.reduce((s,c)=>s+Number(currentAmount(c,state.quotes[c.code]||{})||0),0),cost=funds.reduce((s,c)=>s+Number(c.cost||0),0);const lines=[`基金看板 ${fmtTime(Date.now())}`,`当前持有额 ¥${fmtMoney(total)} · 累计 ${fmtMoney(total-cost,true)}`,`主线 ${state.current?fmtTime(state.current.updated_at):'--'} · ${funds.length}只基金`];for(const c of funds){const q=state.quotes[c.code]||{},e=estimate(c,q);lines.push(`${c.code} ${c.name||''} ¥${fmtMoney(currentAmount(c,q))} 今日${e.has?fmtPct(e.estPct):'待正式'} 累计${fmtMoney(cumulativeProfit(c,q),true)}`);}navigator.clipboard?.writeText(lines.join('\n')).then(()=>toast('摘要已复制')).catch(()=>toast('复制失败'));}
 
 async function openTrend(code){const c=state.cores.find(x=>x.code===code);if(!c||!state.authenticated)return;trendState={code,name:c.name||code,rows:[],range:'1m'};$('#trendTitle').textContent=c.name||code;$('#trendCode').textContent=code;$('#trendModal').classList.remove('hidden');$('#trendLoading').classList.remove('hidden');$('#trendChart').innerHTML='';try{const d=await fnFetch({action:'trend',code});trendState.rows=Array.isArray(d.trend)?d.trend:[];renderTrend();}catch(e){$('#trendLoading').textContent=`走势加载失败：${e.message}`;}}
@@ -131,7 +132,7 @@ function rangeStart(range){const d=new Date();if(range==='1m')d.setMonth(d.getMo
 function renderTrend(){const start=rangeStart(trendState.range),rows=trendState.rows.filter(x=>Number(x.x)>=start);if(rows.length<2){$('#trendLoading').textContent='该区间暂无足够走势数据';$('#trendLoading').classList.remove('hidden');return;}$('#trendLoading').classList.add('hidden');const ys=rows.map(x=>Number(x.y)),min=Math.min(...ys),max=Math.max(...ys),span=max-min||1,w=680,h=280,pad=18;const pts=rows.map((r,i)=>{const x=pad+i/(rows.length-1)*(w-pad*2),y=h-pad-(Number(r.y)-min)/span*(h-pad*2);return`${x.toFixed(2)},${y.toFixed(2)}`}).join(' ');$('#trendChart').innerHTML=`<polyline fill="none" stroke="#2f6fed" stroke-width="3" vector-effect="non-scaling-stroke" points="${pts}"/><line x1="${pad}" y1="${h-pad}" x2="${w-pad}" y2="${h-pad}" stroke="#e5eaf2"/>`;const first=Number(rows[0].y),last=Number(rows.at(-1).y),ret=(last/first-1)*100;$('#trendReturn').textContent=fmtPct(ret);$('#trendReturn').className=cls(ret);$('#trendLatest').textContent=navFmt(last);$('#trendHigh').textContent=navFmt(max);$('#trendLow').textContent=navFmt(min);$('#trendPeriod').textContent=`${new Date(rows[0].x).toLocaleDateString('zh-CN')} → ${new Date(rows.at(-1).x).toLocaleDateString('zh-CN')}`;}
 
 function bind(){
-  $('#loginBtn').onclick=async()=>{const b=$('#loginBtn');b.disabled=true;b.textContent='验证中…';setLoginStatus('正在验证账号并建立私密会话…','checking');try{clearSensitiveState();await login($('#emailInput').value.trim(),$('#passwordInput').value);$('#passwordInput').value='';setLoginStatus('登录验证通过，基金数据仅对当前账号显示。','ok');render();toast('安全登录成功');if(isCnTradingAutoWindow())refreshQuotes({force:false,skipCloud:true,silent:true});}catch(e){clearSession();clearSensitiveState();setLoginStatus(e.message,'error');render();toast(e.message,3500);}finally{b.disabled=false;b.textContent='安全登录';}};$('#passwordInput').addEventListener('keydown',e=>{if(e.key==='Enter')$('#loginBtn').click();});
+  $('#loginBtn').onclick=async()=>{const b=$('#loginBtn');b.disabled=true;b.textContent='验证中…';setLoginStatus('正在验证账号和密码…','checking');try{clearSensitiveState();await login($('#emailInput').value.trim(),$('#passwordInput').value);localStorage.setItem(TRUSTED_DEVICE_KEY,'1');$('#passwordInput').value='';setLoginStatus('登录成功：这台手机已记住登录，以后可自动进入。','ok');render();toast('安全登录成功');if(isCnTradingAutoWindow())refreshQuotes({force:false,skipCloud:true,silent:true});}catch(e){clearSession();clearSensitiveState();localStorage.removeItem(TRUSTED_DEVICE_KEY);setLoginStatus(e.message,'error');render();toast(e.message,3500);}finally{b.disabled=false;b.textContent='安全登录';}};$('#passwordInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click();}});
   $('#refreshBtn').onclick=()=>refreshQuotes({force:true,skipCloud:false,silent:false});$('#copyBtn').onclick=copySummary;$('#tradeBtn').onclick=()=>openSheet('tradeSheet');$('#settingsBtn').onclick=()=>{renderSettings();openSheet('settingsSheet')};$('#cloudBtn').onclick=()=>{renderHistory();openSheet('historySheet')};$('#diagBtn').onclick=()=>openSheet('diagSheet');$('#runDiagBtn').onclick=runDiag;$('#logoutBtn').onclick=logout;
   $('#tradeAction').onchange=()=>$('#tradeAmountWrap').classList.toggle('hidden',$('#tradeAction').value==='clear');$('#lookupTradeBtn').onclick=lookupTrade;$('#saveTradeBtn').onclick=saveTrade;
   $('#addFundBtn').onclick=addSetting;$('#autoMatchBtn').onclick=autoMatch;$('#saveSettingsBtn').onclick=saveSettings;
@@ -148,29 +149,49 @@ function bind(){
 
 async function start(){
   bind();loadPublicCache();
+  let trusted=false;
   const firstSecureRun=localStorage.getItem(PRIVACY_MIGRATION_KEY)!=='1';
   if(firstSecureRun){
+    // v2.3.6 第一次运行：旧版本留下的任何会话都不算“已授权”。
     clearSession();clearSensitiveState();clearSensitiveCache();
     try{
+      localStorage.removeItem(TRUSTED_DEVICE_KEY);
       for(let i=localStorage.length-1;i>=0;i--){
         const k=localStorage.key(i);
         if(k&&k.startsWith('sb-')&&k.includes('auth-token'))localStorage.removeItem(k);
       }
       localStorage.setItem(PRIVACY_MIGRATION_KEY,'1');
     }catch(_){}
-    setLoginStatus('安全升级已启用：请重新登录一次。登录成功后，这台手机以后会自动保持登录。','checking');
-    state.session=null;
+    setLoginStatus('新版首次使用：请手动输入密码并点击“安全登录”一次。登录成功后，这台手机以后会自动进入。','checking');
   }else{
-    try{state.session=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(_){state.session=null;}
+    try{trusted=localStorage.getItem(TRUSTED_DEVICE_KEY)==='1';}catch(_){trusted=false;}
+    if(trusted){
+      try{state.session=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(_){state.session=null;}
+      if(!state.session){
+        trusted=false;
+        try{localStorage.removeItem(TRUSTED_DEVICE_KEY);}catch(_){}
+      }
+    }else{
+      // 没有在 v2.3.6 中成功登录过，就绝不接受旧会话自动进入。
+      clearSession();
+      setLoginStatus('请输入账号和密码，并点击“安全登录”。仅点击输入框不会进入看板。');
+    }
   }
   state.authenticated=false;clearSensitiveState();
   const d=new Date();$('#tradeDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   render();
-  if(state.session){
-    setLoginStatus('正在验证已保存的登录状态…','checking');
-    try{await verifySessionOnline();await loadCloud();setLoginStatus('已安全登录。','ok');render();if(isCnTradingAutoWindow())await refreshQuotes({force:false,skipCloud:true,silent:true});else setCloudStatus('私密云端已连接 · 非交易时段不自动刷新行情','ok');}
-    catch(e){clearSession();clearSensitiveState();clearSensitiveCache();setLoginStatus(`${e.message}。请重新登录。`,'error');render();}
+  if(trusted&&state.session){
+    setLoginStatus('正在验证这台已授权手机的登录状态…','checking');
+    try{
+      await verifySessionOnline();await loadCloud();setLoginStatus('已安全登录。','ok');render();
+      if(isCnTradingAutoWindow())await refreshQuotes({force:false,skipCloud:true,silent:true});
+      else setCloudStatus('私密云端已连接 · 非交易时段不自动刷新行情','ok');
+    }catch(e){
+      clearSession();clearSensitiveState();clearSensitiveCache();
+      try{localStorage.removeItem(TRUSTED_DEVICE_KEY);}catch(_){}
+      setLoginStatus(`${e.message}。请重新输入密码登录一次。`,'error');render();
+    }
   }
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.3.5').catch(()=>{});
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.3.6').catch(()=>{});
 }
 start();
