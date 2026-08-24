@@ -4,6 +4,7 @@ const SB_URL='https://bdqvhpuzricmpfkomnli.supabase.co';
 const SB_KEY='sb_publishable_NC1WUyEGSlZfgfyQR7JBxA_AM14sz39';
 const FN_URL=`${SB_URL}/functions/v1/fund-quotes`;
 const SESSION_KEY='fd_mobile_supabase_session_v1';
+const PRIVACY_MIGRATION_KEY='fd_private_login_guard_v235_once';
 const CACHE_KEY='fd_mobile_desktop_parity_cache_v230';
 const QUOTE_KEY='fd_mobile_quote_cache_v230';
 const MARKET_KEY='fd_mobile_market_cache_v2';
@@ -147,15 +148,29 @@ function bind(){
 
 async function start(){
   bind();loadPublicCache();
-  try{state.session=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(_){state.session=null;}
+  const firstSecureRun=localStorage.getItem(PRIVACY_MIGRATION_KEY)!=='1';
+  if(firstSecureRun){
+    clearSession();clearSensitiveState();clearSensitiveCache();
+    try{
+      for(let i=localStorage.length-1;i>=0;i--){
+        const k=localStorage.key(i);
+        if(k&&k.startsWith('sb-')&&k.includes('auth-token'))localStorage.removeItem(k);
+      }
+      localStorage.setItem(PRIVACY_MIGRATION_KEY,'1');
+    }catch(_){}
+    setLoginStatus('安全升级已启用：请重新登录一次。登录成功后，这台手机以后会自动保持登录。','checking');
+    state.session=null;
+  }else{
+    try{state.session=JSON.parse(localStorage.getItem(SESSION_KEY)||'null');}catch(_){state.session=null;}
+  }
   state.authenticated=false;clearSensitiveState();
   const d=new Date();$('#tradeDate').value=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
   render();
   if(state.session){
-    setLoginStatus('正在验证上次登录状态…','checking');
-    try{await verifySessionOnline();await loadCloud();setLoginStatus('登录验证通过。','ok');render();if(isCnTradingAutoWindow())await refreshQuotes({force:false,skipCloud:true,silent:true});else setCloudStatus('私密云端已连接 · 非交易时段不自动刷新行情','ok');}
-    catch(e){clearSession();clearSensitiveState();clearSensitiveCache();setLoginStatus(`${e.message}。为保护持仓，本次不会显示本地缓存。`,'error');render();}
+    setLoginStatus('正在验证已保存的登录状态…','checking');
+    try{await verifySessionOnline();await loadCloud();setLoginStatus('已安全登录。','ok');render();if(isCnTradingAutoWindow())await refreshQuotes({force:false,skipCloud:true,silent:true});else setCloudStatus('私密云端已连接 · 非交易时段不自动刷新行情','ok');}
+    catch(e){clearSession();clearSensitiveState();clearSensitiveCache();setLoginStatus(`${e.message}。请重新登录。`,'error');render();}
   }
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js').catch(()=>{});
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.3.5').catch(()=>{});
 }
 start();
