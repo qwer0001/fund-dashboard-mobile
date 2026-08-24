@@ -7,7 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="format-detection" content="telephone=no" />
-  <title>基金看板</title>
+  <title>基金看板 · 私密版</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
   <link rel="stylesheet" href="./styles.css" />
@@ -19,13 +19,14 @@
     <div class="login-brand">
       <div class="app-icon">基</div>
       <h1>基金看板</h1>
-      <p>手机端 · 与电脑端共用同一份云端账本</p>
+      <p>私密手机版 · 登录验证通过后才显示基金数据</p>
     </div>
     <section class="login-card">
+      <div class="privacy-badge">🔒 私密访问</div>
       <label>邮箱<input id="emailInput" type="email" autocomplete="username" placeholder="请输入基金看板账号邮箱"></label>
       <label>密码<input id="passwordInput" type="password" autocomplete="current-password" placeholder="请输入密码"></label>
-      <button id="loginBtn" class="primary full">登录公共云端</button>
-      <small>登录后自动读取 Supabase 中的最新持仓与历史记录。</small>
+      <button id="loginBtn" class="primary full">安全登录</button>
+      <small id="loginStatus">未登录时不会读取或显示持仓、收益、历史记录；退出登录后会清理本机敏感缓存。</small>
     </section>
   </main>
 
@@ -45,7 +46,7 @@
     <section id="statusCard" class="status-card ok">
       <div class="status-main">
         <span class="status-dot" aria-hidden="true"></span>
-        <div><b id="cloudStatus">公共云端最新主线已连接</b><small id="statusDetail">Supabase · Singapore</small></div>
+        <div><b id="cloudStatus">私密云端最新主线已连接</b><small id="statusDetail">Supabase · 已登录保护</small></div>
       </div>
       <div class="status-right"><b id="mainlineTime">--</b><small id="historyMini">历史 0/30 条</small></div>
     </section>
@@ -145,13 +146,13 @@
 
   <section id="historySheet" class="sheet hidden">
     <div class="sheet-grabber" aria-hidden="true"></div>
-    <div class="sheet-head"><div><b>公共云端 · 主线历史</b><small>最多30条 · 超过3天仍保留</small></div><button data-close aria-label="关闭">×</button></div>
+    <div class="sheet-head"><div><b>私密云端 · 主线历史</b><small>最多30条 · 超过3天仍保留</small></div><button data-close aria-label="关闭">×</button></div>
     <div class="sheet-body"><div id="currentMainline" class="current-mainline"></div><div id="historyList" class="history-list"></div></div>
   </section>
 
   <section id="diagSheet" class="sheet hidden">
     <div class="sheet-grabber" aria-hidden="true"></div>
-    <div class="sheet-head"><div><b>网络诊断</b><small>检查公共云端与行情代理</small></div><button data-close aria-label="关闭">×</button></div>
+    <div class="sheet-head"><div><b>网络诊断</b><small>检查私密云端与行情代理</small></div><button data-close aria-label="关闭">×</button></div>
     <div class="sheet-body"><button id="runDiagBtn" class="primary full">开始诊断</button><pre id="diagResult" class="diag-result">尚未诊断</pre><button id="logoutBtn" class="danger full">退出登录</button></div>
   </section>
 
