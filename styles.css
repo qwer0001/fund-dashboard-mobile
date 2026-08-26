@@ -75,3 +75,17 @@ button,input,select{font:inherit}button{cursor:pointer;border:1px solid #dbe2ec;
 @media(max-width:360px){
   .top-actions #copyBtn{display:none}.summary-card.hero strong{font-size:27px}.compact-card strong{font-size:18px}.estimate-item small{display:none}.fund-name b{max-width:160px}.fund-body{grid-template-columns:1fr 1fr}.fund-metric.quote-metric{grid-column:1/-1}.fund-metric:last-child{grid-column:auto}.settings-calc{grid-template-columns:1fr 1fr}.settings-calc div:last-child{grid-column:1/-1}.trend-stats{grid-template-columns:1fr 1fr}
 }
+
+
+/* v2.3.7 个人交易体验优化 */
+.trade-picker{display:grid;gap:8px;margin-bottom:10px}
+.trade-fund-select{display:grid;gap:7px;color:#52627c;font-size:13px}
+.trade-fund-select select{width:100%;min-height:46px;border:1px solid #d7dfeb;border-radius:12px;padding:10px 12px;background:#fff;color:var(--text);outline:none;font-size:15px}
+.trade-fund-select select:focus{border-color:#8db2ff;box-shadow:0 0 0 3px #e8f0ff}
+.trade-fund-summary{min-height:36px;display:flex;align-items:center;padding:8px 10px;background:#f6f8fc;border:1px solid var(--line);border-radius:11px;font-size:11px;line-height:1.45}
+.trade-fields{align-items:end}
+.clear-trade-tip{margin:8px 0 4px;padding:9px 10px;border-radius:11px;background:#fff7e7;color:#8b5d00;font-size:11px;line-height:1.5;border:1px solid #f2dfb3}
+@media (max-width:520px){
+  .trade-fields.form-grid.two{grid-template-columns:1fr 1fr}
+  .trade-fields #tradeCodeWrap{grid-column:1/-1}
+}

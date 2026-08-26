@@ -10,7 +10,7 @@
   <title>基金看板 · 私密版</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=2.3.6" />
+  <link rel="stylesheet" href="./styles.css?v=2.3.7" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -121,13 +121,18 @@
     <div class="sheet-grabber" aria-hidden="true"></div>
     <div class="sheet-head"><div><b>快捷添加 / 记录操作</b><small>先记待确认，正式净值后入账</small></div><button data-close aria-label="关闭">×</button></div>
     <div class="sheet-body">
-      <div class="form-grid two">
-        <label>基金代码<input id="tradeCode" maxlength="6" inputmode="numeric" placeholder="如 110020"></label>
+      <div class="trade-picker">
+        <label class="trade-fund-select">基金<select id="tradeFundSelect"><option value="">选择已有基金</option><option value="__new__">＋ 新基金</option></select></label>
+        <div id="tradeFundSummary" class="trade-fund-summary muted">选择已有基金；新基金请选择“＋ 新基金”</div>
+      </div>
+      <div class="form-grid two trade-fields">
+        <label id="tradeCodeWrap" class="hidden">基金代码<input id="tradeCode" maxlength="6" inputmode="numeric" placeholder="如 110020"></label>
         <label>操作<select id="tradeAction"><option value="buy">买入/加仓</option><option value="sell">卖出/减仓</option><option value="clear">全部卖出</option></select></label>
         <label id="tradeAmountWrap">金额<input id="tradeAmount" type="number" min="0" step="0.01" inputmode="decimal" placeholder="200"></label>
         <label>交易日<input id="tradeDate" type="date"></label>
       </div>
-      <div class="lookup-line"><button id="lookupTradeBtn">识别基金</button><span id="matchedFund" class="muted">输入6位基金代码自动识别</span></div>
+      <div id="newFundLookup" class="lookup-line hidden"><button id="lookupTradeBtn">识别基金</button><span id="matchedFund" class="muted">输入6位基金代码自动识别</span></div>
+      <div id="clearTradeTip" class="clear-trade-tip hidden">全部卖出无需填写金额；正式净值公布后按清仓处理。</div>
       <button id="saveTradeBtn" class="primary full sticky-submit">记录操作</button>
       <div class="quick-note">买入/卖出不会立刻修改持有额和成本；对应交易日正式净值公布后自动确认。</div>
       <div class="mini-title">最近操作</div><div id="tradeHistory" class="trade-history"><span class="muted">暂无记录</span></div>
@@ -166,6 +171,6 @@
     </div>
   </section>
 
-  <script src="./app.js?v=2.3.6"></script>
+  <script src="./app.js?v=2.3.7"></script>
 </body>
 </html>

@@ -36,6 +36,42 @@ const shortDate=s=>/^\d{4}-\d{2}-\d{2}$/.test(String(s||''))?String(s).slice(5):
 let state={session:null,authenticated:false,current:null,history:[],cores:[],quotes:{},markets:{},lastSyncAt:null,sourceStatus:null,marketError:null,busy:false};
 let currentFilter='all';
 let trendState={code:null,name:null,rows:[],range:'1m'};
+let selectedTradeFund=null;
+
+function tradeFundAmount(c){return c?currentAmount(c,state.quotes[c.code]||{}):null;}
+function tradeFunds(){return state.cores.filter(c=>c&&c.enabled!==false&&/^\d{6}$/.test(String(c.code||''))).slice().sort((a,b)=>Number(tradeFundAmount(b)||0)-Number(tradeFundAmount(a)||0));}
+function renderTradeFundSelect(){
+  const sel=$('#tradeFundSelect');if(!sel)return;
+  const prev=sel.value;
+  const list=tradeFunds();
+  sel.innerHTML='<option value="">选择已有基金</option>'+list.map(c=>`<option value="${esc(c.code)}">${esc(c.name||c.code)}（${esc(c.code)}）</option>`).join('')+'<option value="__new__">＋ 新基金</option>';
+  if(prev&&[...sel.options].some(o=>o.value===prev))sel.value=prev;
+  else if(selectedTradeFund&&[...sel.options].some(o=>o.value===String(selectedTradeFund.code)))sel.value=String(selectedTradeFund.code);
+  else sel.value='';
+  syncTradePicker(false);
+}
+function syncTradePicker(resetAmount=true){
+  const sel=$('#tradeFundSelect'),codeWrap=$('#tradeCodeWrap'),codeInput=$('#tradeCode'),lookup=$('#newFundLookup'),summary=$('#tradeFundSummary');
+  if(!sel||!codeInput)return;
+  const value=sel.value;
+  if(value==='__new__'){
+    selectedTradeFund=null;codeWrap.classList.remove('hidden');lookup.classList.remove('hidden');codeInput.readOnly=false;
+    if(resetAmount){codeInput.value='';$('#matchedFund').textContent='输入6位基金代码自动识别';}
+    summary.textContent='新基金：输入6位基金代码识别后记录买入；确认进入账本后会自动出现在这里。';
+  }else if(/^\d{6}$/.test(value)){
+    const c=state.cores.find(x=>String(x.code)===value)||null;selectedTradeFund=c;codeWrap.classList.add('hidden');lookup.classList.add('hidden');codeInput.readOnly=true;codeInput.value=value;
+    const amt=tradeFundAmount(c);summary.textContent=c?`${c.name||c.code}（${c.code}） · 当前持有约 ¥${fmtMoney(amt)}`:'请选择基金';
+  }else{
+    selectedTradeFund=null;codeWrap.classList.add('hidden');lookup.classList.add('hidden');codeInput.readOnly=true;codeInput.value='';summary.textContent='选择已有基金；新基金请选择“＋ 新基金”';
+  }
+  updateTradeActionUI(resetAmount);
+}
+function updateTradeActionUI(resetAmount=false){
+  const action=$('#tradeAction')?.value||'buy',wrap=$('#tradeAmountWrap'),tip=$('#clearTradeTip'),input=$('#tradeAmount');if(!wrap||!tip||!input)return;
+  const isClear=action==='clear';wrap.classList.toggle('hidden',isClear);tip.classList.toggle('hidden',!isClear);
+  if(isClear||resetAmount)input.value='';
+  if(selectedTradeFund){const amt=tradeFundAmount(selectedTradeFund);const s=$('#tradeFundSummary');if(isClear)s.textContent=`${selectedTradeFund.name||selectedTradeFund.code}（${selectedTradeFund.code}） · 当前持有约 ¥${fmtMoney(amt)} · 将全部卖出`;else s.textContent=`${selectedTradeFund.name||selectedTradeFund.code}（${selectedTradeFund.code}） · 当前持有约 ¥${fmtMoney(amt)}`;}
+}
 
 function toast(msg,ms=2300){const e=$('#toast');e.textContent=msg;e.classList.remove('hidden');clearTimeout(toast.t);toast.t=setTimeout(()=>e.classList.add('hidden'),ms);}
 function deviceId(){let id=localStorage.getItem(DEVICE_KEY);if(!id){id=`mobile-${crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+Math.random().toString(36).slice(2)}`;localStorage.setItem(DEVICE_KEY,id);}return id;}
@@ -103,14 +139,38 @@ function renderTradeHistory(funds){const items=[];for(const c of funds)for(const
 
 function setCloudStatus(text,kind='ok'){const c=$('#statusCard');c.className=`status-card ${kind}`;$('#cloudStatus').textContent=text;$('#mainlineTime').textContent=state.current?fmtTime(state.current.updated_at):'--';$('#historyMini').textContent=`历史 ${state.history.length}/${HISTORY_LIMIT} 条`;$('#statusDetail').textContent=state.current?`${state.cores.filter(c=>c.enabled!==false).length}只基金 · ${state.current.device_name||'私密云端'}`:'Supabase · Singapore';}
 function render(){const logged=!!state.session&&state.authenticated===true;$('#loginView').classList.toggle('hidden',logged);$('#appView').classList.toggle('hidden',!logged);$('#bottomNav').classList.toggle('hidden',!logged);if(!logged)return;setCloudStatus(state.current?'私密云端最新主线已连接':'私密云端没有主线',state.current?'ok':'bad');const funds=state.cores.filter(c=>c.enabled!==false),items=funds.map(c=>({c,q:state.quotes[c.code]||{}}));const total=items.reduce((s,x)=>s+Number(currentAmount(x.c,x.q)||0),0),cost=funds.reduce((s,c)=>s+Number(c.cost||0),0),cum=total-cost;const estimated=items.map(x=>({...x,e:estimate(x.c,x.q)})).filter(x=>x.e.has),today=estimated.reduce((s,x)=>s+Number(x.e.estProfit||0),0),covered=estimated.reduce((s,x)=>s+Number(currentAmount(x.c,x.q)||0),0),coveredPct=total>0?covered/total*100:0,reliable=estimated.filter(x=>x.e.reliable),reliableP=reliable.reduce((s,x)=>s+Number(x.e.estProfit||0),0),pending=funds.filter(c=>!estimate(c,state.quotes[c.code]||{}).has),pendingAmt=pending.reduce((s,c)=>s+Number(currentAmount(c,state.quotes[c.code]||{})||0),0),pendingPct=total>0?pendingAmt/total*100:0;const officialRows=items.map(x=>({c:x.c,h:officialProfit(x.c,x.q)})).filter(x=>x.h);const target=officialRows.map(x=>x.h.date).sort().reverse()[0]||null,official=officialRows.filter(x=>x.h.date===target).reduce((s,x)=>s+Number(x.h.profit||0),0),officialCount=officialRows.filter(x=>x.h.date===target).length;
-  $('#totalAmount').textContent=`¥${fmtMoney(total)}`;$('#totalCum').textContent=`累计 ${fmtMoney(cum,true)} (${cost?fmtPct(cum/cost*100):'--'})`;$('#todayEstimate').textContent=estimated.length?fmtMoney(today,true):'--';$('#todayEstimate').className=estimated.length?cls(today):'';$('#todayEstimateHint').textContent=estimated.length?`覆盖 ${estimated.length}只 · ${coveredPct.toFixed(1)}%仓位`:'暂无可用盘中参考值';$('#coverageFill').style.width=`${Math.min(100,Math.max(0,coveredPct))}%`;$('#estimateBadge').textContent=coveredPct>=70?'覆盖较高':coveredPct>=30?'部分覆盖':'覆盖较低';$('#intradayTotal').textContent=reliable.length?fmtMoney(reliableP,true):'--';$('#intradayTotal').className=reliable.length?cls(reliableP):'';$('#coveredAmount').textContent=`¥${fmtMoney(covered)}`;$('#coveredPct').textContent=`占总持仓 ${coveredPct.toFixed(1)}%`;$('#bondPendingAmount').textContent=`¥${fmtMoney(pendingAmt)}`;$('#bondPendingPct').textContent=`占总持仓 ${pendingPct.toFixed(1)}%`;$('#officialTotal').textContent=target?fmtMoney(official,true):'--';$('#officialTotal').className=target?cls(official):'';$('#officialDate').textContent=target?`${target} · ${officialCount}/${funds.length}只已记录`:'刷新后建立正式净值基准';renderMarkets();renderBreakdown(funds,total);renderFunds(funds);renderTradeHistory(funds);$('#syncText').textContent=state.lastSyncAt?`最后同步 ${new Date(state.lastSyncAt).toLocaleString('zh-CN')}`:'行情尚未刷新';$('#sourceText').textContent=state.sourceStatus?`正式源 ${state.sourceStatus.quoteSuccess||0}/${state.sourceStatus.total||0} · 大盘${state.sourceStatus.marketOk?'正常':'待同步'}`:'私密云端账本已连接';$('#syncErrorText').textContent=state.marketError||'';saveCache();}
+  $('#totalAmount').textContent=`¥${fmtMoney(total)}`;$('#totalCum').textContent=`累计 ${fmtMoney(cum,true)} (${cost?fmtPct(cum/cost*100):'--'})`;$('#todayEstimate').textContent=estimated.length?fmtMoney(today,true):'--';$('#todayEstimate').className=estimated.length?cls(today):'';$('#todayEstimateHint').textContent=estimated.length?`覆盖 ${estimated.length}只 · ${coveredPct.toFixed(1)}%仓位`:'暂无可用盘中参考值';$('#coverageFill').style.width=`${Math.min(100,Math.max(0,coveredPct))}%`;$('#estimateBadge').textContent=coveredPct>=70?'覆盖较高':coveredPct>=30?'部分覆盖':'覆盖较低';$('#intradayTotal').textContent=reliable.length?fmtMoney(reliableP,true):'--';$('#intradayTotal').className=reliable.length?cls(reliableP):'';$('#coveredAmount').textContent=`¥${fmtMoney(covered)}`;$('#coveredPct').textContent=`占总持仓 ${coveredPct.toFixed(1)}%`;$('#bondPendingAmount').textContent=`¥${fmtMoney(pendingAmt)}`;$('#bondPendingPct').textContent=`占总持仓 ${pendingPct.toFixed(1)}%`;$('#officialTotal').textContent=target?fmtMoney(official,true):'--';$('#officialTotal').className=target?cls(official):'';$('#officialDate').textContent=target?`${target} · ${officialCount}/${funds.length}只已记录`:'刷新后建立正式净值基准';renderMarkets();renderBreakdown(funds,total);renderFunds(funds);renderTradeFundSelect();renderTradeHistory(funds);$('#syncText').textContent=state.lastSyncAt?`最后同步 ${new Date(state.lastSyncAt).toLocaleString('zh-CN')}`:'行情尚未刷新';$('#sourceText').textContent=state.sourceStatus?`正式源 ${state.sourceStatus.quoteSuccess||0}/${state.sourceStatus.total||0} · 大盘${state.sourceStatus.marketOk?'正常':'待同步'}`:'私密云端账本已连接';$('#syncErrorText').textContent=state.marketError||'';saveCache();}
 
 function openSheet(id){$('#sheetBackdrop').classList.remove('hidden');$('#'+id).classList.remove('hidden');document.body.style.overflow='hidden';}
 function closeSheets(){$('#sheetBackdrop').classList.add('hidden');$$('.sheet').forEach(x=>x.classList.add('hidden'));document.body.style.overflow='';}
 
 async function lookupCode(code){if(!/^\d{6}$/.test(code))throw new Error('请输入6位基金代码');const d=await fnFetch({action:'quotes',codes:[code]});if(d?.markets)state.markets=d.markets;const raw=d?.quotes?.[code];if(!raw||(!raw.name&&!finite(raw.officialNav)))throw new Error('没有识别到这只基金');return raw;}
-async function lookupTrade(){const code=$('#tradeCode').value.trim();const b=$('#lookupTradeBtn');b.disabled=true;b.textContent='识别中…';try{const q=await lookupCode(code);$('#matchedFund').textContent=`${q.name||code} · 最新净值 ${navFmt(q.officialNav)} · ${q.officialDate||'--'}`;state.quotes[code]={...(state.quotes[code]||{}),...q};}catch(e){$('#matchedFund').textContent=e.message;}finally{b.disabled=false;b.textContent='识别基金';}}
-async function saveTrade(){const code=$('#tradeCode').value.trim(),action=$('#tradeAction').value,amount=Math.max(0,Number($('#tradeAmount').value||0)),date=$('#tradeDate').value;if(!/^\d{6}$/.test(code)||!date)return toast('请输入6位基金代码和交易日');if(action!=='clear'&&!(amount>0))return toast('请输入操作金额');let next=clone(state.cores),c=next.find(x=>x.code===code);try{if(!c){const q=await lookupCode(code);c={code,name:q.name||code,type:classifyFund(q.name||''),enabled:true,cost:0,shares:0,amountAnchor:0,startDate:new Date().toISOString().slice(0,10),pendingTrades:[],createdByQuickTrade:true,updatedAt:Date.now()};next.push(c);}c.pendingTrades=Array.isArray(c.pendingTrades)?c.pendingTrades:[];c.pendingTrades.push({id:`m_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,date,action,amount,feeRate:0,applied:false,deferredAccounting:true,createdAt:new Date().toISOString()});c.updatedAt=Date.now();await commit(next,`${tradeLabel[action]||action} ${c.name||c.code}${action==='clear'?'':` ¥${amount.toFixed(2)}`}`);closeSheets();toast('操作已写入私密云端，等待正式净值确认');}catch(e){if(e.code==='revision_conflict'){await loadCloud();toast('另一台设备已更新云端，请重新操作',3500);}else toast(e.message,3500);}}
+async function lookupTrade(){const code=$('#tradeCode').value.trim();const b=$('#lookupTradeBtn');b.disabled=true;b.textContent='识别中…';try{const q=await lookupCode(code);$('#matchedFund').textContent=`${q.name||code} · 最新净值 ${navFmt(q.officialNav)} · ${q.officialDate||'--'}`;state.quotes[code]={...(state.quotes[code]||{}),...q};$('#tradeFundSummary').textContent=`新基金：${q.name||code}（${code}）`;}catch(e){$('#matchedFund').textContent=e.message;}finally{b.disabled=false;b.textContent='识别基金';}}
+async function saveTrade(){
+  const code=$('#tradeCode').value.trim(),action=$('#tradeAction').value,amount=Math.max(0,Number($('#tradeAmount').value||0)),date=$('#tradeDate').value;
+  if(!/^\d{6}$/.test(code)||!date)return toast('请选择基金并填写交易日');
+  if(action!=='clear'&&!(amount>0))return toast('请输入操作金额');
+  let next=clone(state.cores),c=next.find(x=>x.code===code);
+  try{
+    if(!c){
+      if(action!=='buy')return toast('新基金请先记录买入');
+      const q=await lookupCode(code);c={code,name:q.name||code,type:classifyFund(q.name||''),enabled:true,cost:0,shares:0,amountAnchor:0,startDate:new Date().toISOString().slice(0,10),pendingTrades:[],createdByQuickTrade:true,updatedAt:Date.now()};next.push(c);
+    }
+    const live=state.cores.find(x=>x.code===code),held=live?tradeFundAmount(live):null;
+    if(action==='sell'&&finite(held)&&amount>Number(held)+0.01)return toast(`卖出金额超过当前持有约 ¥${fmtMoney(held)}`,3200);
+    if(action==='clear'){
+      const heldText=finite(held)?`当前持有约 ¥${fmtMoney(held)}`:'当前持有金额待同步';
+      if(!confirm(`确认全部卖出？\n\n${c.name||c.code}（${c.code}）\n${heldText}\n\n操作会先记为待确认，正式净值发布后清仓。`))return;
+    }
+    c.pendingTrades=Array.isArray(c.pendingTrades)?c.pendingTrades:[];
+    c.pendingTrades.push({id:`m_${Date.now()}_${Math.random().toString(36).slice(2,7)}`,date,action,amount:action==='clear'?0:amount,feeRate:0,applied:false,deferredAccounting:true,createdAt:new Date().toISOString()});c.updatedAt=Date.now();
+    const op=action==='clear'?`全部卖出 ${c.name||c.code}（待正式确认）`:`${tradeLabel[action]||action} ${c.name||c.code} ¥${amount.toFixed(2)}`;
+    await commit(next,op);
+    $('#tradeAmount').value='';
+    if($('#tradeFundSelect').value==='__new__'){$('#tradeFundSelect').value=code;selectedTradeFund=state.cores.find(x=>x.code===code)||null;}
+    closeSheets();toast('操作已写入私密云端，等待正式净值确认');
+  }catch(e){if(e.code==='revision_conflict'){await loadCloud();toast('另一台设备已更新云端，请重新操作',3500);}else toast(e.message,3500);}
+}
 async function cancelTrade(code,id){const next=clone(state.cores),c=next.find(x=>x.code===code);if(!c)return;c.pendingTrades=(c.pendingTrades||[]).filter(t=>t.id!==id||t.applied);c.updatedAt=Date.now();try{await commit(next,`撤销待确认操作 ${c.name||code}`);toast('已撤销待确认操作');}catch(e){toast(e.message,3200);}}
 
 function settingsCalc(c,q){const shares=finite(c.shares)?Number(c.shares):0,cost=Number(c.cost||0),costNav=shares>0?cost/shares:0,nav=Number(q?.officialNav||0),amount=shares>0&&nav>0?shares*nav:(finite(c.amountAnchor)?Number(c.amountAnchor):0),profit=amount-cost,rate=cost>0?profit/cost*100:null;return{shares,cost,costNav,nav,amount,profit,rate};}
@@ -133,8 +193,8 @@ function renderTrend(){const start=rangeStart(trendState.range),rows=trendState.
 
 function bind(){
   $('#loginBtn').onclick=async()=>{const b=$('#loginBtn');b.disabled=true;b.textContent='验证中…';setLoginStatus('正在验证账号和密码…','checking');try{clearSensitiveState();await login($('#emailInput').value.trim(),$('#passwordInput').value);localStorage.setItem(TRUSTED_DEVICE_KEY,'1');$('#passwordInput').value='';setLoginStatus('登录成功：这台手机已记住登录，以后可自动进入。','ok');render();toast('安全登录成功');if(isCnTradingAutoWindow())refreshQuotes({force:false,skipCloud:true,silent:true});}catch(e){clearSession();clearSensitiveState();localStorage.removeItem(TRUSTED_DEVICE_KEY);setLoginStatus(e.message,'error');render();toast(e.message,3500);}finally{b.disabled=false;b.textContent='安全登录';}};$('#passwordInput').addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault();$('#loginBtn').click();}});
-  $('#refreshBtn').onclick=()=>refreshQuotes({force:true,skipCloud:false,silent:false});$('#copyBtn').onclick=copySummary;$('#tradeBtn').onclick=()=>openSheet('tradeSheet');$('#settingsBtn').onclick=()=>{renderSettings();openSheet('settingsSheet')};$('#cloudBtn').onclick=()=>{renderHistory();openSheet('historySheet')};$('#diagBtn').onclick=()=>openSheet('diagSheet');$('#runDiagBtn').onclick=runDiag;$('#logoutBtn').onclick=logout;
-  $('#tradeAction').onchange=()=>$('#tradeAmountWrap').classList.toggle('hidden',$('#tradeAction').value==='clear');$('#lookupTradeBtn').onclick=lookupTrade;$('#saveTradeBtn').onclick=saveTrade;
+  $('#refreshBtn').onclick=()=>refreshQuotes({force:true,skipCloud:false,silent:false});$('#copyBtn').onclick=copySummary;$('#tradeBtn').onclick=()=>{renderTradeFundSelect();openSheet('tradeSheet')};$('#settingsBtn').onclick=()=>{renderSettings();openSheet('settingsSheet')};$('#cloudBtn').onclick=()=>{renderHistory();openSheet('historySheet')};$('#diagBtn').onclick=()=>openSheet('diagSheet');$('#runDiagBtn').onclick=runDiag;$('#logoutBtn').onclick=logout;
+  $('#tradeFundSelect').onchange=()=>syncTradePicker(true);$('#tradeAction').onchange=()=>updateTradeActionUI(false);$('#lookupTradeBtn').onclick=lookupTrade;$('#saveTradeBtn').onclick=saveTrade;$('#tradeCode').addEventListener('input',()=>{if($('#tradeFundSelect').value!=='__new__')return;const v=$('#tradeCode').value.trim();if(v.length===6)lookupTrade();else{$('#matchedFund').textContent='输入6位基金代码自动识别';$('#tradeFundSummary').textContent='新基金：输入6位基金代码识别后记录买入；确认进入账本后会自动出现在这里。';}});
   $('#addFundBtn').onclick=addSetting;$('#autoMatchBtn').onclick=autoMatch;$('#saveSettingsBtn').onclick=saveSettings;
   $('#sheetBackdrop').onclick=closeSheets;$$('[data-close]').forEach(b=>b.onclick=closeSheets);
   $$('.filter').forEach(b=>b.onclick=()=>{$$('.filter').forEach(x=>x.classList.remove('active'));b.classList.add('active');currentFilter=b.dataset.filter;renderFunds(state.cores.filter(c=>c.enabled!==false));});
@@ -142,7 +202,7 @@ function bind(){
   $('#tradeHistory').addEventListener('click',e=>{const b=e.target.closest('[data-cancel-trade]');if(b&&confirm('撤销这条待确认操作？'))cancelTrade(b.dataset.code,b.dataset.cancelTrade);});
   $('#settingsList').addEventListener('click',e=>{const del=e.target.closest('[data-delete]');if(del){if(confirm('确定删除这只基金？保存后旧主线仍会进入历史，最多保留30条。')){state.cores.splice(Number(del.dataset.delete),1);renderSettings();}return;}const look=e.target.closest('[data-lookup]');if(look)lookupSetting(Number(look.dataset.lookup));});
   $('#historyList').addEventListener('click',async e=>{const b=e.target.closest('[data-restore]');if(!b)return;if(!confirm(`确定把 ${fmtTime(b.dataset.time)} 的内容设为新的最新主线吗？\n\n当前主线会先进入历史，所以仍可反悔。`))return;try{await restoreHistory(b.dataset.restore);renderHistory();toast('历史版本已生成新的最新主线');}catch(err){if(err.code==='revision_conflict'){await loadCloud();renderHistory();toast('云端已被其他设备更新，请重新选择',3500);}else toast(err.message,3500);}});
-  $$('#bottomNav [data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;$$('#bottomNav button').forEach(x=>x.classList.toggle('active',x===b));if(n==='home')window.scrollTo({top:0,behavior:'smooth'});if(n==='trade')openSheet('tradeSheet');if(n==='history'){renderHistory();openSheet('historySheet');}if(n==='settings'){renderSettings();openSheet('settingsSheet');}});
+  $$('#bottomNav [data-nav]').forEach(b=>b.onclick=()=>{const n=b.dataset.nav;$$('#bottomNav button').forEach(x=>x.classList.toggle('active',x===b));if(n==='home')window.scrollTo({top:0,behavior:'smooth'});if(n==='trade'){renderTradeFundSelect();openSheet('tradeSheet');}if(n==='history'){renderHistory();openSheet('historySheet');}if(n==='settings'){renderSettings();openSheet('settingsSheet');}});
   $('#trendCloseBtn').onclick=()=>$('#trendModal').classList.add('hidden');$('#trendModal').addEventListener('click',e=>{if(e.target===$('#trendModal'))$('#trendModal').classList.add('hidden');});$$('#trendTabs button').forEach(b=>b.onclick=()=>{$$('#trendTabs button').forEach(x=>x.classList.remove('active'));b.classList.add('active');trendState.range=b.dataset.range;renderTrend();});
   window.addEventListener('online',()=>{if(state.session&&state.authenticated)loadCloud().then(()=>toast('网络已恢复，主线已刷新')).catch(()=>{});});
 }
@@ -192,6 +252,6 @@ async function start(){
       setLoginStatus(`${e.message}。请重新输入密码登录一次。`,'error');render();
     }
   }
-  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.3.6').catch(()=>{});
+  if('serviceWorker'in navigator)navigator.serviceWorker.register('./sw.js?v=2.3.7').catch(()=>{});
 }
 start();
