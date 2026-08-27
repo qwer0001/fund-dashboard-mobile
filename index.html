@@ -10,7 +10,7 @@
   <title>基金看板 · 私密版</title>
   <link rel="manifest" href="./manifest.webmanifest" />
   <link rel="apple-touch-icon" href="./icons/icon-192.png" />
-  <link rel="stylesheet" href="./styles.css?v=2.3.8" />
+  <link rel="stylesheet" href="./styles.css?v=2.4.1" />
 </head>
 <body>
   <div id="toast" class="toast hidden"></div>
@@ -164,13 +164,13 @@
   <section id="trendModal" class="trend-modal hidden" role="dialog" aria-modal="true">
     <div class="trend-panel">
       <div class="trend-head"><div><b id="trendTitle">基金走势</b><span id="trendCode"></span></div><button id="trendCloseBtn" aria-label="关闭">×</button></div>
-      <div id="trendTabs" class="trend-tabs"><button data-range="1m" class="active">近1月</button><button data-range="3m">近3月</button><button data-range="6m">近6月</button><button data-range="1y">近1年</button><button data-range="3y">近3年</button><button data-range="all">全部</button></div>
+      <div id="trendTabs" class="trend-tabs"><button data-range="1m" class="active">近1月</button><button data-range="3m">近3月</button><button data-range="6m">近6月</button><button data-range="1y">近1年</button><button data-range="3y">近3年</button><button data-range="5y">近5年</button><button data-range="all">全部</button></div>
       <div class="trend-stats"><div><span>区间涨跌</span><b id="trendReturn">--</b></div><div><span>最新净值</span><b id="trendLatest">--</b></div><div><span>区间最高</span><b id="trendHigh">--</b></div><div><span>区间最低</span><b id="trendLow">--</b></div></div>
-      <div class="trend-chart-wrap"><div id="trendLoading" class="trend-loading">加载正式净值走势…</div><svg id="trendChart" viewBox="0 0 680 280" preserveAspectRatio="none"></svg></div>
-      <div class="trend-foot"><span id="trendPeriod">--</span><span>正式单位净值 · 日终数据</span></div>
+      <div class="trend-chart-wrap"><div id="trendLoading" class="trend-loading">加载正式净值走势…</div><svg id="trendChart" viewBox="0 0 680 280" preserveAspectRatio="none"></svg><div id="trendTooltip" class="trend-tooltip hidden"></div></div>
+      <div class="trend-foot"><span id="trendPeriod">--</span><span>正式单位净值 · 红买绿卖</span></div>
     </div>
   </section>
 
-  <script src="./app.js?v=2.3.8"></script>
+  <script src="./app.js?v=2.4.1"></script>
 </body>
 </html>

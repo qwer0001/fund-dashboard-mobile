@@ -89,3 +89,7 @@ button,input,select{font:inherit}button{cursor:pointer;border:1px solid #dbe2ec;
   .trade-fields.form-grid.two{grid-template-columns:1fr 1fr}
   .trade-fields #tradeCodeWrap{grid-column:1/-1}
 }
+
+/* v2.4.0：五年交易轨迹。买入红点，卖出/清仓绿点；长周期自动隐藏文字。 */
+.trend-tooltip{position:absolute;z-index:5;pointer-events:none;padding:6px 8px;border-radius:8px;color:#fff;background:rgba(17,24,39,.92);font-size:10px;line-height:1.45;white-space:nowrap;transform:translate(-50%,-115%);max-width:88%;overflow:hidden;text-overflow:ellipsis}.trend-tooltip.hidden{display:none}
+.trade-marker{stroke:#fff;stroke-width:1.5;vector-effect:non-scaling-stroke}.trade-marker.buy{fill:#ef4444}.trade-marker.sell,.trade-marker.clear{fill:#16a34a}.trade-marker-label{font-size:9px;font-weight:800;text-anchor:middle;dominant-baseline:central;pointer-events:none}.trade-marker-label.buy{fill:#ef4444}.trade-marker-label.sell,.trade-marker-label.clear{fill:#16a34a}
