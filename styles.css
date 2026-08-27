@@ -77,7 +77,7 @@ button,input,select{font:inherit}button{cursor:pointer;border:1px solid #dbe2ec;
 }
 
 
-/* v2.3.7 个人交易体验优化 */
+/* v2.3.8 清仓后主列表自动隐藏 + 个人交易体验优化 */
 .trade-picker{display:grid;gap:8px;margin-bottom:10px}
 .trade-fund-select{display:grid;gap:7px;color:#52627c;font-size:13px}
 .trade-fund-select select{width:100%;min-height:46px;border:1px solid #d7dfeb;border-radius:12px;padding:10px 12px;background:#fff;color:var(--text);outline:none;font-size:15px}
